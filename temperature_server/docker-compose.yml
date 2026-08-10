@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  ho_app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: ho_app
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./instance:/app/instance  # Persists the SQLite database across restarts
+    restart: always
+
+  serial_listener:
+    build:
+      context: .
+      dockerfile: Dockerfile.serial
+    container_name: serial_listener
+    # Pass host serial device into the container
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+    environment:
+      - PORT=/dev/ttyUSB0
+      - FLASK_HOST=http://ho_app:5000
+    depends_on:
+      - ho_app
+    restart: always

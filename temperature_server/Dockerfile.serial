@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy serial reader script
+COPY serial_reader.py .
+
+CMD ["python", "-u", "serial_reader.py"]

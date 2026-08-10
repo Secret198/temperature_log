@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Dashboard</title>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .filter-btn:hover {
+            background: #f3f4f6;
+        }
+        .filter-btn.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 750px;
+            height: 400px;
+        }
+        .filter-container {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        select, button {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background-color: white;
+            font-size: 14px;
+        }
+        button.reset-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button.reset-btn:hover {
+            background-color: #dc2626;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hőmérséklet ingadozások</h1>
+
+    <!-- Filter Buttons -->
+    <div class="controls">
+        <button class="filter-btn active" onclick="filterData('all', this)">Összes</button>
+        <button class="filter-btn" onclick="filterData(24, this)">Legutóbbi 24 óra</button>
+        <button class="filter-btn" onclick="filterData(7, this, 'days')">Legutóbbi 7 nap</button>
+        <button class="filter-btn" onclick="filterData(30, this, 'days')">Legutóbbi 30 nap</button>
+    </div>
+
+    <!-- Canvas for Chart.js -->
+    <div class="chart-container">
+        <canvas id="tempChart"></canvas>
+    </div>
+
+    <div class="filter-container">
+        <select id="yearFilter" onchange="applyFilters()">
+            <option value="">Minden év</option>
+        </select>
+
+        <select id="monthFilter" onchange="applyFilters()">
+            <option value="">Minden hónap</option>
+            <option value="01">Január</option>
+            <option value="02">Február</option>
+            <option value="03">Március</option>
+            <option value="04">Április</option>
+            <option value="05">Május</option>
+            <option value="06">Június</option>
+            <option value="07">Július</option>
+            <option value="08">Augusztus</option>
+            <option value="09">Szeptember</option>
+            <option value="10">Október</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+        </select>
+
+        <select id="dayFilter" onchange="applyFilters()">
+            <option value="">Minden nap</option>
+        </select>
+
+        <button class="reset-btn" onclick="resetFilters()">Szűrők törlése</button>
+    </div>
+
+    <script>
+        // 1. Safely serialize Flask database objects into a JS Array
+        // Format expected: array of objects [{ temperature: 22.5, timestamp: "2026-08-10 10:00:00" }, ...]
+        const rawData = [
+            {% for t in temperatures %}
+                { 
+                    temperature: {{ t.temperature }},
+                    timestamp: "{{ t.timestamp }}" 
+                },
+            {% endfor %}
+        ];
+        
+        function getGradient(ctx, chartArea) {
+        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+        // 0 = bottom of chart (Cold/Blue), 1 = top of chart (Hot/Red)
+        gradient.addColorStop(0, '#3b82f6');   // Cold
+        gradient.addColorStop(0.5, '#f59e0b'); // Warm
+        gradient.addColorStop(1, '#ef4444');   // Hot
+        return gradient;
+}
+
+        const parseDate = (str) => new Date(str.replace(' ', 'T'));
+
+        let tempChart;
+
+        function initChart(data) {
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            
+            tempChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(item => item.timestamp),
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: data.map(item => item.temperature),
+                        borderColor: '#ff4757',
+                        backgroundColor: 'rgba(255, 71, 87, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { title: { display: true, text: 'Időpont' } },
+                        y: { title: { display: true, text: 'Hőmérséklet (°C)' } }
+                    }
+                }
+            });
+        }
+
+        // 2. Dynamic Filtering Function
+        function filterData(limit, btnElement, unit = 'hours') {
+            // Update active state on buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            if (btnElement) btnElement.classList.add('active');
+
+            let filtered = rawData;
+
+            if (limit !== 'all') {
+                const now = new Date();
+                const cutoff = new Date(now);
+
+                if (unit === 'hours') {
+                    cutoff.setHours(now.getHours() - limit);
+                } else if (unit === 'days') {
+                    cutoff.setDate(now.getDate() - limit);
+                }
+
+                filtered = rawData.filter(item => {
+                    const itemDate = new Date(item.timestamp);
+                    return itemDate >= cutoff;
+                });
+            }
+            filtered.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            // Update Chart labels and datasets
+            tempChart.data.labels = filtered.map(item => item.timestamp);
+            tempChart.data.datasets[0].data = filtered.map(item => item.temperature);
+            tempChart.update(); // Re-render animation smoothly
+        }
+
+        function setupDropdowns() {
+            const yearSelect = document.getElementById('yearFilter');
+            const daySelect = document.getElementById('dayFilter');
+
+            // Populate unique years present in the dataset
+            const years = [...new Set(rawData.map(item => parseDate(item.timestamp).getFullYear()))].sort((a,b) => b - a);
+            years.forEach(year => {
+                if(!isNaN(year)) {
+                    yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
+                }
+            });
+
+            // Populate Days 1 to 31
+            for (let i = 1; i <= 31; i++) {
+                const dayVal = String(i).padStart(2, '0');
+                daySelect.innerHTML += `<option value="${dayVal}">${i}</option>`;
+            }
+        }
+
+        // 4. Main Filtering Function
+        function applyFilters() {
+            const selectedYear = document.getElementById('yearFilter').value;
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const selectedDay = document.getElementById('dayFilter').value;
+
+            // Filter data according to selected dropdown values
+            let filtered = rawData.filter(item => {
+                const dateObj = parseDate(item.timestamp);
+                const itemYear = String(dateObj.getFullYear());
+                const itemMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const itemDay = String(dateObj.getDate()).padStart(2, '0');
+
+                if (selectedYear && itemYear !== selectedYear) return false;
+                if (selectedMonth && itemMonth !== selectedMonth) return false;
+                if (selectedDay && itemDay !== selectedDay) return false;
+
+                return true;
+            });
+
+            // Ensure dataset is always sorted strictly in ASCENDING order (Oldest -> Newest)
+            filtered.sort((a, b) => parseDate(a.timestamp) - parseDate(b.timestamp));
+
+            // Update chart data
+            tempChart.data.labels = filtered.map(item => item.timestamp);
+            tempChart.data.datasets[0].data = filtered.map(item => item.temperature);
+            tempChart.update();
+        }
+
+        // Reset all filters
+        function resetFilters() {
+            document.getElementById('yearFilter').value = "";
+            document.getElementById('monthFilter').value = "";
+            document.getElementById('dayFilter').value = "";
+            applyFilters();
+        }
+
+        // Initialize chart on page load
+        initChart(rawData);
+        setupDropdowns();
+        applyFilters();
+    </script>
+</body>
+</html>
