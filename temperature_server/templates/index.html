@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,6 +19,7 @@
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
         .filter-btn {
             padding: 8px 16px;
@@ -27,6 +28,9 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: 500;
+            text-decoration: none;
+            color: #1f2937;
+            display: inline-block;
             transition: all 0.2s ease;
         }
         .filter-btn:hover {
@@ -42,6 +46,7 @@
             width: 100%;
             max-width: 750px;
             height: 400px;
+            margin-bottom: 20px;
         }
         .filter-container {
             display: flex;
@@ -57,6 +62,16 @@
             background-color: white;
             font-size: 14px;
         }
+        button.apply-btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button.apply-btn:hover {
+            background-color: #1d4ed8;
+        }
         button.reset-btn {
             background-color: #ef4444;
             color: white;
@@ -71,25 +86,30 @@
 <body>
     <h1>Hőmérséklet ingadozások</h1>
 
-    <!-- Filter Buttons -->
     <div class="controls">
-        <button class="filter-btn active" onclick="filterData('all', this)">Összes</button>
-        <button class="filter-btn" onclick="filterData(24, this)">Legutóbbi 24 óra</button>
-        <button class="filter-btn" onclick="filterData(7, this, 'days')">Legutóbbi 7 nap</button>
-        <button class="filter-btn" onclick="filterData(30, this, 'days')">Legutóbbi 30 nap</button>
+        <button onclick=" setActiveButton('btn-24h'); window.location.href = '/'" class="filter-btn active" id="btn-24h">Legutóbbi 24 óra</button>
+        <button onclick="setActiveButton('btn-week'); updateChartData('/last_week')" class="filter-btn" id="btn-week">Legutóbbi 7 nap</button>
+        <button onclick="setActiveButton('btn-month'); updateChartData('/last_month')" class="filter-btn" id="btn-month">Legutóbbi hónap</button>
+        <button onclick="setActiveButton('btn-year'); updateChartData('/last_year')" class="filter-btn" id="btn-year">Legutóbbi év</button>
+        <button onclick="setActiveButton('btn-all'); updateChartData('/all')" class="filter-btn" id="btn-all">Összes</button>
     </div>
+
 
     <!-- Canvas for Chart.js -->
     <div class="chart-container">
         <canvas id="tempChart"></canvas>
     </div>
 
+    <!-- Date Dropdown Navigation -->
     <div class="filter-container">
-        <select id="yearFilter" onchange="applyFilters()">
-            <option value="">Minden év</option>
+        <select id="yearFilter">
+            <option value="">Válassz évet</option>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
         </select>
 
-        <select id="monthFilter" onchange="applyFilters()">
+        <select id="monthFilter">
             <option value="">Minden hónap</option>
             <option value="01">Január</option>
             <option value="02">Február</option>
@@ -105,16 +125,16 @@
             <option value="12">December</option>
         </select>
 
-        <select id="dayFilter" onchange="applyFilters()">
+        <select id="dayFilter">
             <option value="">Minden nap</option>
         </select>
 
-        <button class="reset-btn" onclick="resetFilters()">Szűrők törlése</button>
+        <button class="apply-btn" onclick="applyFilters()">Szűrés</button>
+        <button class="reset-btn" onclick="window.location.href='/'">Szűrők törlése</button>
     </div>
 
     <script>
-        // 1. Safely serialize Flask database objects into a JS Array
-        // Format expected: array of objects [{ temperature: 22.5, timestamp: "2026-08-10 10:00:00" }, ...]
+        // 1. Raw Data rendered from Flask backend queries
         const rawData = [
             {% for t in temperatures %}
                 { 
@@ -123,17 +143,6 @@
                 },
             {% endfor %}
         ];
-        
-        function getGradient(ctx, chartArea) {
-        const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-        // 0 = bottom of chart (Cold/Blue), 1 = top of chart (Hot/Red)
-        gradient.addColorStop(0, '#3b82f6');   // Cold
-        gradient.addColorStop(0.5, '#f59e0b'); // Warm
-        gradient.addColorStop(1, '#ef4444');   // Hot
-        return gradient;
-}
-
-        const parseDate = (str) => new Date(str.replace(' ', 'T'));
 
         let tempChart;
 
@@ -145,7 +154,7 @@
                 data: {
                     labels: data.map(item => item.timestamp),
                     datasets: [{
-                        label: 'Temperature (°C)',
+                        label: 'Hőmérséklet (°C)',
                         data: data.map(item => item.temperature),
                         borderColor: '#ff4757',
                         backgroundColor: 'rgba(255, 71, 87, 0.2)',
@@ -157,105 +166,126 @@
                 },
                 options: {
                     responsive: true,
+                    maintainAspectRatio: false,
                     scales: {
-                        x: { title: { display: true, text: 'Időpont' } },
+                        x: { title: { display: true, text: 'Időpont / Dátum' } },
                         y: { title: { display: true, text: 'Hőmérséklet (°C)' } }
                     }
                 }
             });
         }
 
-        // 2. Dynamic Filtering Function
-        function filterData(limit, btnElement, unit = 'hours') {
-            // Update active state on buttons
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            if (btnElement) btnElement.classList.add('active');
-
-            let filtered = rawData;
-
-            if (limit !== 'all') {
-                const now = new Date();
-                const cutoff = new Date(now);
-
-                if (unit === 'hours') {
-                    cutoff.setHours(now.getHours() - limit);
-                } else if (unit === 'days') {
-                    cutoff.setDate(now.getDate() - limit);
-                }
-
-                filtered = rawData.filter(item => {
-                    const itemDate = new Date(item.timestamp);
-                    return itemDate >= cutoff;
-                });
-            }
-            filtered.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-            // Update Chart labels and datasets
-            tempChart.data.labels = filtered.map(item => item.timestamp);
-            tempChart.data.datasets[0].data = filtered.map(item => item.temperature);
-            tempChart.update(); // Re-render animation smoothly
-        }
-
-        function setupDropdowns() {
-            const yearSelect = document.getElementById('yearFilter');
+        // Dynamically populate days dropdown (01 to 31)
+        function setupDayDropdown() {
             const daySelect = document.getElementById('dayFilter');
-
-            // Populate unique years present in the dataset
-            const years = [...new Set(rawData.map(item => parseDate(item.timestamp).getFullYear()))].sort((a,b) => b - a);
-            years.forEach(year => {
-                if(!isNaN(year)) {
-                    yearSelect.innerHTML += `<option value="${year}">${year}</option>`;
-                }
-            });
-
-            // Populate Days 1 to 31
             for (let i = 1; i <= 31; i++) {
                 const dayVal = String(i).padStart(2, '0');
                 daySelect.innerHTML += `<option value="${dayVal}">${i}</option>`;
             }
         }
 
-        // 4. Main Filtering Function
-        function applyFilters() {
-            const selectedYear = document.getElementById('yearFilter').value;
-            const selectedMonth = document.getElementById('monthFilter').value;
-            const selectedDay = document.getElementById('dayFilter').value;
+        // Highlight active preset button based on current URL path
+        // function setActiveButton(btn) {
+        //     // const path = window.location.pathname;
+        //     // if (path === '/') document.getElementById('btn-24h').classList.add('active');
+        //     // else if (path === '/last_week') document.getElementById('btn-week').classList.add('active');
+        //     // else if (path === '/last_month') document.getElementById('btn-month').classList.add('active');
+        //     // else if (path === '/last_year') document.getElementById('btn-year').classList.add('active');
+        //     // else if (path === '/all') document.getElementById('btn-all').classList.add('active');
+        //     document.getElementById(btn).classList.add('active')
+        // }
 
-            // Filter data according to selected dropdown values
-            let filtered = rawData.filter(item => {
-                const dateObj = parseDate(item.timestamp);
-                const itemYear = String(dateObj.getFullYear());
-                const itemMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
-                const itemDay = String(dateObj.getDate()).padStart(2, '0');
-
-                if (selectedYear && itemYear !== selectedYear) return false;
-                if (selectedMonth && itemMonth !== selectedMonth) return false;
-                if (selectedDay && itemDay !== selectedDay) return false;
-
-                return true;
+        // Highlight active preset button and remove highlight from others
+        function setActiveButton(activeBtnId) {
+            // 1. Remove active class from all filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
             });
 
-            // Ensure dataset is always sorted strictly in ASCENDING order (Oldest -> Newest)
-            filtered.sort((a, b) => parseDate(a.timestamp) - parseDate(b.timestamp));
-
-            // Update chart data
-            tempChart.data.labels = filtered.map(item => item.timestamp);
-            tempChart.data.datasets[0].data = filtered.map(item => item.temperature);
-            tempChart.update();
+            // 2. Add active class to the clicked button
+            const selectedBtn = document.getElementById(activeBtnId);
+            if (selectedBtn) {
+                selectedBtn.classList.add('active');
+            }
         }
 
-        // Reset all filters
-        function resetFilters() {
-            document.getElementById('yearFilter').value = "";
-            document.getElementById('monthFilter').value = "";
-            document.getElementById('dayFilter').value = "";
-            applyFilters();
+        // Navigate directly to your dynamic Flask routes based on user dropdown choices
+        // function applyFilters() {
+        //     const year = document.getElementById('yearFilter').value;
+        //     const month = document.getElementById('monthFilter').value;
+        //     const day = document.getElementById('dayFilter').value;
+
+        //     if (!year) {
+        //         alert("Kérjük, válassz legalább egy évet!");
+        //         return;
+        //     }
+
+        //     if (year && month && day) {
+        //         // Calls @app.route("/ev/<year_month_day>")
+        //         window.location.href = `/ev/${year}-${month}-${day}`;
+        //     } else if (year && month) {
+        //         // Calls @app.route("/ev/<year_month>")
+        //         window.location.href = `/ev/honap/${year}-${month}`;
+        //     } else if (year) {
+        //         // Calls @app.route("/ev/<year>")
+        //         window.location.href = `/ev/honap/nap/${year}`;
+        //     }
+
+            
+        // }
+
+                // Fetch fresh JSON from the Flask API and update Chart.js
+        async function updateChartData(endpoint) {
+            try {
+                const response = await fetch(endpoint);
+                const data = await response.json();
+
+                // Update Chart.js labels and dataset
+                tempChart.data.labels = data.map(item => item.timestamp);
+                tempChart.data.datasets[0].data = data.map(item => item.temperature);
+                
+                // Trigger Chart.js smooth re-render animation
+                tempChart.update();
+            } catch (error) {
+                console.error("Error fetching temperature data:", error);
+            }
         }
 
-        // Initialize chart on page load
+        // Handler for the "Szűrés" button click
+        function applyFilters() {
+            const year = document.getElementById('yearFilter').value;
+            const month = document.getElementById('monthFilter').value;
+            const day = document.getElementById('dayFilter').value;
+
+            if (!year) {
+                alert("Kérjük, válassz legalább egy évet!");
+                return;
+            }
+            let url = "/ev"
+            let dateStr = year;
+            if (month){
+                dateStr += `-${month}`;
+                url += "/honap"
+            } 
+            if (day){
+                dateStr += `-${day}`;
+                url += "/nap"
+            }
+
+            // Fetch and render without reloading!
+            updateChartData(`${url}/${dateStr}`);
+        }
+
+        // Handler for preset range buttons
+        function loadPreset(preset) {
+            if (preset === '24h') updateChartData('/api/data');
+            else if (preset === 'week') updateChartData('/api/data/last_week');
+            // Add additional preset endpoints as needed
+        }
+
+        // Initialize setup on page load
         initChart(rawData);
-        setupDropdowns();
-        applyFilters();
+        setupDayDropdown();
     </script>
 </body>
 </html>

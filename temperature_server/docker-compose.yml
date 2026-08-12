@@ -19,9 +19,9 @@ services:
     container_name: serial_listener
     # Pass host serial device into the container
     devices:
-      - "/dev/ttyUSB0:/dev/ttyUSB0"
+      - "/dev/ttyACM0:/dev/ttyACM0"
     environment:
-      - PORT=/dev/ttyUSB0
+      - PORT=/dev/ttyACM0
       - FLASK_HOST=http://ho_app:5000
     depends_on:
       - ho_app
