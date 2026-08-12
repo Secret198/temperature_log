@@ -47,14 +47,14 @@ def home():
     else:
         query = text("""
                 SELECT 
-                    strftime('%d', timestamp) AS day_num,
+                    strftime('%H', timestamp) AS hour_num,
                     ROUND(AVG(temperature), 2) AS temperature,
-                    strftime('%Y-%m-%d', timestamp) AS timestamp,
+                    strftime('%Y-%m-%d %H:%M:%S', timestamp) AS timestamp,
                     COUNT(*) AS record_count
                 FROM temperature
                 WHERE timestamp >= datetime('now', '-1 day', 'localtime')
-                GROUP BY day_num
-                ORDER BY day_num ASC;
+                GROUP BY hour_num
+                ORDER BY hour_num ASC;
             """)
         
         result = db.session.execute(query)
