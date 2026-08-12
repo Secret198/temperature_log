@@ -41,7 +41,9 @@ def home():
                         temperature,
                         strftime('%Y-%m-%d %H:%M:%S', timestamp) AS timestamp
                     FROM temperature
-                    WHERE timestamp >= datetime('now', '-1 day', 'localtime')""")
+                    WHERE timestamp >= datetime('now', '-1 day', 'localtime')
+                    ORDER BY timestamp ASC
+                    """)
         temperatures = db.session.execute(query).mappings()
         # temperatures = db.session.execute(db.select(Temperature).order_by(Temperature.timestamp.asc())).scalars()
     else:
@@ -54,7 +56,7 @@ def home():
                 FROM temperature
                 WHERE timestamp >= datetime('now', '-1 day', 'localtime')
                 GROUP BY hour_num
-                ORDER BY hour_num ASC;
+                ORDER BY timestamp ASC;
             """)
         
         result = db.session.execute(query)
@@ -114,7 +116,7 @@ def based_on_year_month_day(year_month_day):
             FROM temperature
             WHERE strftime('%Y-%m-%d', timestamp) = :year_month_day
             GROUP BY hour_num
-            ORDER BY hour_num ASC;
+            ORDER BY timestamp ASC;
         """)
     
     result = db.session.execute(query, {"year_month_day": year_month_day})
