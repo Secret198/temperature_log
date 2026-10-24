@@ -1,140 +1,276 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temperature Dashboard</title>
+    <title>Temperature Analytics & Forecast Dashboard</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icon.svg') }}">
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 0 20px;
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
         }
-        .controls {
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 30px 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 15px;
+        }
+
+        /* Controls Section */
+        .controls-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preset-buttons {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
         }
+
         .filter-btn {
-            padding: 8px 16px;
-            border: 1px solid #d1d5db;
+            padding: 9px 18px;
+            border: 1px solid var(--border-color);
             background: #ffffff;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
-            text-decoration: none;
-            color: #1f2937;
-            display: inline-block;
+            font-size: 14px;
+            color: var(--text-color);
             transition: all 0.2s ease;
         }
+
         .filter-btn:hover {
-            background: #f3f4f6;
+            background: #f1f5f9;
         }
+
         .filter-btn.active {
-            background: #2563eb;
-            color: white;
-            border-color: #2563eb;
+            background: var(--primary-color);
+            color: #ffffff;
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
         }
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 750px;
-            height: 400px;
-            margin-bottom: 20px;
-        }
-        .filter-container {
+
+        .dropdown-filters {
             display: flex;
             gap: 12px;
             align-items: center;
-            margin-bottom: 20px;
             flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
         }
-        select, button {
-            padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            background-color: white;
+
+        select, button.action-btn {
+            padding: 9px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: #ffffff;
             font-size: 14px;
+            color: var(--text-color);
+            outline: none;
         }
+
+        select:focus {
+            border-color: var(--primary-color);
+        }
+
+        button.action-btn {
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
         button.apply-btn {
-            background-color: #2563eb;
-            color: white;
+            background-color: var(--primary-color);
+            color: #ffffff;
             border: none;
-            cursor: pointer;
-            font-weight: 500;
         }
+
         button.apply-btn:hover {
-            background-color: #1d4ed8;
+            background-color: var(--primary-hover);
         }
+
         button.reset-btn {
-            background-color: #ef4444;
-            color: white;
+            background-color: var(--danger-color);
+            color: #ffffff;
             border: none;
-            cursor: pointer;
         }
+
         button.reset-btn:hover {
-            background-color: #dc2626;
+            background-color: var(--danger-hover);
+        }
+
+        /* Side-by-Side Charts Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-card-header {
+            margin-bottom: 16px;
+        }
+
+        .chart-card-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .chart-card-header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+            height: 380px;
         }
     </style>
 </head>
 <body>
-    <h1>Hőmérséklet ingadozások</h1>
 
-    <div class="controls">
-        <button onclick=" setActiveButton('btn-24h'); window.location.href = '/'" class="filter-btn active" id="btn-24h">Legutóbbi 24 óra</button>
-        <button onclick="setActiveButton('btn-week'); updateChartData('/last_week')" class="filter-btn" id="btn-week">Legutóbbi 7 nap</button>
-        <button onclick="setActiveButton('btn-month'); updateChartData('/last_month')" class="filter-btn" id="btn-month">Legutóbbi hónap</button>
-        <button onclick="setActiveButton('btn-year'); updateChartData('/last_year')" class="filter-btn" id="btn-year">Legutóbbi év</button>
-        <button onclick="setActiveButton('btn-all'); updateChartData('/yearly')" class="filter-btn" id="btn-all">Összes</button>
+    <div class="header">
+        <h1>Temperature Analytics Dashboard</h1>
+        <p>Monitor real-time historical fluctuations and view SARIMAX model predictions side-by-side.</p>
     </div>
 
+    <!-- Filter Controls Card -->
+    <div class="controls-card">
+        <!-- Preset Range Controls -->
+        <div class="preset-buttons">
+            <button onclick="setActiveButton('btn-24h'); window.location.href = '/'" class="filter-btn active" id="btn-24h">Last 24 Hours</button>
+            <button onclick="setActiveButton('btn-week'); updateChartData('/last_week')" class="filter-btn" id="btn-week">Last 7 Days</button>
+            <button onclick="setActiveButton('btn-month'); updateChartData('/last_month')" class="filter-btn" id="btn-month">Last Month</button>
+            <button onclick="setActiveButton('btn-year'); updateChartData('/last_year')" class="filter-btn" id="btn-year">Last Year</button>
+            <button onclick="setActiveButton('btn-all'); updateChartData('/yearly')" class="filter-btn" id="btn-all">All Records</button>
+        </div>
 
-    <!-- Canvas for Chart.js -->
-    <div class="chart-container">
-        <canvas id="tempChart"></canvas>
+        <!-- Date Selectors -->
+        <div class="dropdown-filters">
+            <select id="yearFilter">
+                <option value="">Select Year</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+            </select>
+
+            <select id="monthFilter">
+                <option value="">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+
+            <select id="dayFilter">
+                <option value="">All Days</option>
+            </select>
+
+            <button class="action-btn apply-btn" onclick="applyFilters()">Apply Filters</button>
+            <button class="action-btn reset-btn" onclick="window.location.href='/'">Reset</button>
+        </div>
     </div>
 
-    <!-- Date Dropdown Navigation -->
-    <div class="filter-container">
-        <select id="yearFilter">
-            <option value="">Válassz évet</option>
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-        </select>
+    <!-- Charts Container Grid -->
+    <div class="dashboard-grid">
+        <!-- Chart 1: Historical Data -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h2>Historical Temperature Fluctuations</h2>
+                <p>Observed temperature records over time</p>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="historyChart"></canvas>
+            </div>
+        </div>
 
-        <select id="monthFilter">
-            <option value="">Minden hónap</option>
-            <option value="01">Január</option>
-            <option value="02">Február</option>
-            <option value="03">Március</option>
-            <option value="04">Április</option>
-            <option value="05">Május</option>
-            <option value="06">Június</option>
-            <option value="07">Július</option>
-            <option value="08">Augusztus</option>
-            <option value="09">Szeptember</option>
-            <option value="10">Október</option>
-            <option value="11">November</option>
-            <option value="12">December</option>
-        </select>
-
-        <select id="dayFilter">
-            <option value="">Minden nap</option>
-        </select>
-
-        <button class="apply-btn" onclick="applyFilters()">Szűrés</button>
-        <button class="reset-btn" onclick="window.location.href='/'">Szűrők törlése</button>
+        <!-- Chart 2: ARIMA Forecast -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h2>ARIMA Temperature Forecast</h2>
+                <p>24-hour prediction mean with upper & lower confidence interval</p>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="forecastChart"></canvas>
+            </div>
+        </div>
     </div>
 
     <script>
-        const rawData = [
+        const rawHistoryData = [
             {% for t in temperatures %}
                 { 
                     temperature: {{ t.temperature }},
@@ -143,38 +279,103 @@
             {% endfor %}
         ];
 
-        let tempChart;
+        // ARIMA Forecast predictions passed from Flask
+        const rawForecastData = [
+            {% for f in forecast_data %}
+                {
+                    timestamp: "{{ f.timestamp }}",
+                    temperature: {{ f.temperature }},
+                    lower: {{ f.lower_bound }},
+                    upper: {{ f.upper_bound }}
+                },
+            {% endfor %}
+        ];
 
-        function initChart(data) {
-            const ctx = document.getElementById('tempChart').getContext('2d');
-            
-            tempChart = new Chart(ctx, {
+        let historyChart;
+        let forecastChart;
+
+        function initCharts(historyData, forecastData) {
+            const ctxHistory = document.getElementById('historyChart').getContext('2d');
+            historyChart = new Chart(ctxHistory, {
                 type: 'line',
                 data: {
-                    labels: data.map(item => item.timestamp),
+                    labels: historyData.map(item => item.timestamp),
                     datasets: [{
-                        label: 'Hőmérséklet (°C)',
-                        data: data.map(item => item.temperature),
+                        label: 'Historical (°C)',
+                        data: historyData.map(item => item.temperature),
                         borderColor: '#ff4757',
-                        backgroundColor: 'rgba(255, 71, 87, 0.2)',
+                        backgroundColor: 'rgba(255, 71, 87, 0.15)',
                         borderWidth: 2,
                         fill: true,
                         tension: 0.3,
-                        pointRadius: 4
+                        pointRadius: 3
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { title: { display: true, text: 'Időpont / Dátum' } },
-                        y: { title: { display: true, text: 'Hőmérséklet (°C)' } }
+                        x: { title: { display: true, text: 'Timestamp' } },
+                        y: { title: { display: true, text: 'Temperature (°C)' } }
+                    }
+                }
+            });
+
+            const ctxForecast = document.getElementById('forecastChart').getContext('2d');
+            forecastChart = new Chart(ctxForecast, {
+                type: 'line',
+                data: {
+                    labels: forecastData.map(item => item.timestamp),
+                    datasets: [
+                        {
+                            label: 'Predicted Mean (°C)',
+                            data: forecastData.map(item => item.temperature),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [6, 6],
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#2563eb'
+                        },
+                        {
+                            label: 'Upper Bound',
+                            data: forecastData.map(item => item.upper),
+                            borderColor: 'rgba(37, 99, 235, 0.3)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: '+1', // Fill space down to Lower Bound
+                            backgroundColor: 'rgba(37, 99, 235, 0.15)'
+                        },
+                        {
+                            label: 'Lower Bound',
+                            data: forecastData.map(item => item.lower),
+                            borderColor: 'rgba(37, 99, 235, 0.3)',
+                            borderWidth: 1,
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                // Hide bounds from legend to keep UI clean
+                                filter: item => item.text !== 'Upper Bound' && item.text !== 'Lower Bound'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Forecast Timestamp' } },
+                        y: { title: { display: true, text: 'Temperature (°C)' } }
                     }
                 }
             });
         }
 
-        // Dynamically populate days dropdown (01 to 31)
         function setupDayDropdown() {
             const daySelect = document.getElementById('dayFilter');
             for (let i = 1; i <= 31; i++) {
@@ -183,65 +384,25 @@
             }
         }
 
-        // function setActiveButton(btn) {
-        //     // const path = window.location.pathname;
-        //     // if (path === '/') document.getElementById('btn-24h').classList.add('active');
-        //     // else if (path === '/last_week') document.getElementById('btn-week').classList.add('active');
-        //     // else if (path === '/last_month') document.getElementById('btn-month').classList.add('active');
-        //     // else if (path === '/last_year') document.getElementById('btn-year').classList.add('active');
-        //     // else if (path === '/all') document.getElementById('btn-all').classList.add('active');
-        //     document.getElementById(btn).classList.add('active')
-        // }
-
-        // Highlight active preset button and remove highlight from others
         function setActiveButton(activeBtnId) {
-            // 1. Remove active class from all filter buttons
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
 
-            // 2. Add active class to the clicked button
             const selectedBtn = document.getElementById(activeBtnId);
             if (selectedBtn) {
                 selectedBtn.classList.add('active');
             }
         }
 
-        // function applyFilters() {
-        //     const year = document.getElementById('yearFilter').value;
-        //     const month = document.getElementById('monthFilter').value;
-        //     const day = document.getElementById('dayFilter').value;
-
-        //     if (!year) {
-        //         alert("Kérjük, válassz legalább egy évet!");
-        //         return;
-        //     }
-
-        //     if (year && month && day) {
-        //         // Calls @app.route("/ev/<year_month_day>")
-        //         window.location.href = `/ev/${year}-${month}-${day}`;
-        //     } else if (year && month) {
-        //         // Calls @app.route("/ev/<year_month>")
-        //         window.location.href = `/ev/honap/${year}-${month}`;
-        //     } else if (year) {
-        //         // Calls @app.route("/ev/<year>")
-        //         window.location.href = `/ev/honap/nap/${year}`;
-        //     }
-
-            
-        // }
-
         async function updateChartData(endpoint) {
             try {
                 const response = await fetch(endpoint);
                 const data = await response.json();
 
-                // Update Chart.js labels and dataset
-                tempChart.data.labels = data.map(item => item.timestamp);
-                tempChart.data.datasets[0].data = data.map(item => item.temperature);
-                
-                // Trigger Chart.js smooth re-render animation
-                tempChart.update();
+                historyChart.data.labels = data.map(item => item.timestamp);
+                historyChart.data.datasets[0].data = data.map(item => item.temperature);
+                historyChart.update();
             } catch (error) {
                 console.error("Error fetching temperature data:", error);
             }
@@ -253,29 +414,24 @@
             const day = document.getElementById('dayFilter').value;
 
             if (!year) {
-                alert("Kérjük, válassz legalább egy évet!");
+                alert("Please select at least a year!");
                 return;
             }
-            let url = "/ev"
+            let url = "/ev";
             let dateStr = year;
-            if (month){
+            if (month) {
                 dateStr += `-${month}`;
-                url += "/honap"
+                url += "/honap";
             } 
-            if (day){
+            if (day) {
                 dateStr += `-${day}`;
-                url += "/nap"
+                url += "/nap";
             }
 
             updateChartData(`${url}/${dateStr}`);
         }
 
-        function loadPreset(preset) {
-            if (preset === '24h') updateChartData('/api/data');
-            else if (preset === 'week') updateChartData('/api/data/last_week');
-        }
-
-        initChart(rawData);
+        initCharts(rawHistoryData, rawForecastData);
         setupDayDropdown();
     </script>
 </body>

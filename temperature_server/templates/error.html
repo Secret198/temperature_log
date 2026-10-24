@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hiba {{ code }} - {{ title }}</title>
+    <title>Error {{ code }} - {{ title }}</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icon.svg') }}">
+
     <style>
         * {
             box-sizing: border-box;
@@ -79,16 +81,13 @@
 <body>
 
     <div class="error-card">
-        <!-- Dynamic Status Code -->
         <div class="error-code">{{ code }}</div>
         
-        <!-- Dynamic Title -->
-        <h1 class="error-title">Hiba: {{ code }} ({{ title }})</h1>
+        <h1 class="error-title">Error: {{ code }} ({{ title }})</h1>
         
-        <!-- Dynamic Description Message -->
         <p class="error-message">{{ description }}</p>
 
-        <a href="/" class="btn-home">Vissza a főoldalra</a>
+        <a href="/" class="btn-home">Back to the main page</a>
     </div>
 
 </body>

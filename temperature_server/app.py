@@ -29,17 +29,9 @@ with app.app_context():
 @app.route('/')
 def home():
     all_records = Temperature.get_all_records()
-    forecast_df = calculate_forecast(all_records)
+    forecast_data = calculate_forecast(all_records)
 
-    forecast_data = []
-    for timestamp, row in forecast_df.iterrows():
-        forecast_data.append({
-            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'temperature': round(float(row['mean']), 2),
-            'lower_bound': round(float(row['mean_ci_lower']), 2),
-            'upper_bound': round(float(row['mean_ci_upper']), 2)
-        })
-    print(forecast_data)
+    
 
     temp_count = Temperature.get_today_count()
 
@@ -49,8 +41,8 @@ def home():
     else:
         
         temperatures = Temperature.get_hourly_today()
-    print(temperatures)
-    return render_template('index.html', temperatures=temperatures)
+    print(forecast_data)
+    return render_template('index.html', temperatures=temperatures, forecast_data=forecast_data)
 
 @app.route("/ev/<year>")
 def based_on_year(year):
