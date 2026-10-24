@@ -91,7 +91,7 @@
         <button onclick="setActiveButton('btn-week'); updateChartData('/last_week')" class="filter-btn" id="btn-week">Legutóbbi 7 nap</button>
         <button onclick="setActiveButton('btn-month'); updateChartData('/last_month')" class="filter-btn" id="btn-month">Legutóbbi hónap</button>
         <button onclick="setActiveButton('btn-year'); updateChartData('/last_year')" class="filter-btn" id="btn-year">Legutóbbi év</button>
-        <button onclick="setActiveButton('btn-all'); updateChartData('/all')" class="filter-btn" id="btn-all">Összes</button>
+        <button onclick="setActiveButton('btn-all'); updateChartData('/yearly')" class="filter-btn" id="btn-all">Összes</button>
     </div>
 
 
@@ -134,7 +134,6 @@
     </div>
 
     <script>
-        // 1. Raw Data rendered from Flask backend queries
         const rawData = [
             {% for t in temperatures %}
                 { 
@@ -184,7 +183,6 @@
             }
         }
 
-        // Highlight active preset button based on current URL path
         // function setActiveButton(btn) {
         //     // const path = window.location.pathname;
         //     // if (path === '/') document.getElementById('btn-24h').classList.add('active');
@@ -209,7 +207,6 @@
             }
         }
 
-        // Navigate directly to your dynamic Flask routes based on user dropdown choices
         // function applyFilters() {
         //     const year = document.getElementById('yearFilter').value;
         //     const month = document.getElementById('monthFilter').value;
@@ -234,7 +231,6 @@
             
         // }
 
-                // Fetch fresh JSON from the Flask API and update Chart.js
         async function updateChartData(endpoint) {
             try {
                 const response = await fetch(endpoint);
@@ -251,7 +247,6 @@
             }
         }
 
-        // Handler for the "Szűrés" button click
         function applyFilters() {
             const year = document.getElementById('yearFilter').value;
             const month = document.getElementById('monthFilter').value;
@@ -272,18 +267,14 @@
                 url += "/nap"
             }
 
-            // Fetch and render without reloading!
             updateChartData(`${url}/${dateStr}`);
         }
 
-        // Handler for preset range buttons
         function loadPreset(preset) {
             if (preset === '24h') updateChartData('/api/data');
             else if (preset === 'week') updateChartData('/api/data/last_week');
-            // Add additional preset endpoints as needed
         }
 
-        // Initialize setup on page load
         initChart(rawData);
         setupDayDropdown();
     </script>

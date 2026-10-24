@@ -4,3 +4,6 @@ marshmallow
 pyserial
 requests
 gunicorn
+pandas
+numpy
+statsmodels

@@ -4,6 +4,7 @@ from datetime import datetime, time
 from werkzeug.exceptions import HTTPException
 from sqlalchemy import text, func
 from marshmallow import Schema, fields, validate, ValidationError
+from forecast import calculate_forecast
 
 app = Flask(__name__)
 
@@ -23,193 +24,76 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+
+
 @app.route('/')
 def home():
+    all_records = Temperature.get_all_records()
+    forecast_df = calculate_forecast(all_records)
 
-    query = text("""
-        SELECT count(temperature)     
-            FROM temperature
-            WHERE timestamp >= datetime('now', '-1 day', 'localtime')
-    """)
+    forecast_data = []
+    for timestamp, row in forecast_df.iterrows():
+        forecast_data.append({
+            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'temperature': round(float(row['mean']), 2),
+            'lower_bound': round(float(row['mean_ci_lower']), 2),
+            'upper_bound': round(float(row['mean_ci_upper']), 2)
+        })
+    print(forecast_data)
 
-    temp_count = db.session().execute(query).scalar()
-
-    
+    temp_count = Temperature.get_today_count()
 
     if temp_count < 50:
-        query = text("""SELECT 
-                        temperature,
-                        strftime('%Y-%m-%d %H:%M:%S', timestamp) AS timestamp
-                    FROM temperature
-                    WHERE timestamp >= datetime('now', '-1 day', 'localtime')
-                    ORDER BY timestamp ASC
-                    """)
-        temperatures = db.session.execute(query).mappings()
-        # temperatures = db.session.execute(db.select(Temperature).order_by(Temperature.timestamp.asc())).scalars()
+       
+        temperatures = Temperature.get_all_today()
     else:
-        query = text("""
-                SELECT 
-                    strftime('%H', timestamp) AS hour_num,
-                    ROUND(AVG(temperature), 2) AS temperature,
-                    strftime('%Y-%m-%d %H:%M:%S', timestamp) AS timestamp,
-                    COUNT(*) AS record_count
-                FROM temperature
-                WHERE timestamp >= datetime('now', '-1 day', 'localtime')
-                GROUP BY hour_num
-                ORDER BY timestamp ASC;
-            """)
         
-        result = db.session.execute(query)
-        temperatures = result.mappings().all()
+        temperatures = Temperature.get_hourly_today()
+    print(temperatures)
     return render_template('index.html', temperatures=temperatures)
 
 @app.route("/ev/<year>")
 def based_on_year(year):
-    
-    query = text("""
-        SELECT 
-            strftime('%m', timestamp) AS month_num,
-            ROUND(AVG(temperature), 2) AS temperature,
-            strftime('%Y-%m', timestamp) AS timestamp,
-            COUNT(*) AS record_count
-        FROM temperature
-        WHERE strftime('%Y', timestamp) = :year
-        GROUP BY month_num
-        ORDER BY month_num ASC;
-    """)
-
-    result = db.session.execute(query, {"year": year})
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.based_on_year(year)
     return jsonify([dict(row) for row in temperatures])
 
 @app.route("/ev/honap/<year_month>")
 def based_on_year_month(year_month):
-    
-    query = text("""
-            SELECT 
-                strftime('%d', timestamp) AS day_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y-%m-%d', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            WHERE strftime('%Y-%m', timestamp) = :year_month
-            GROUP BY day_num
-            ORDER BY day_num ASC;
-        """)
-    
-    result = db.session.execute(query, {"year_month": year_month})
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.based_on_year_month(year_month)
     return jsonify([dict(row) for row in temperatures])
-
 
 @app.route("/ev/honap/nap/<year_month_day>")
 def based_on_year_month_day(year_month_day):
-    
-    query = text("""
-            SELECT 
-                strftime('%H', timestamp) AS hour_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y-%m-%d %H', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            WHERE strftime('%Y-%m-%d', timestamp) = :year_month_day
-            GROUP BY hour_num
-            ORDER BY timestamp ASC;
-        """)
-    
-    result = db.session.execute(query, {"year_month_day": year_month_day})
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.based_on_year_month_day(year_month_day)
     return jsonify([dict(row) for row in temperatures])
-
 
 @app.route("/last_week")
 def last_week():
-    
-    query = text("""
-            SELECT 
-                strftime('%d', timestamp) AS day_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y-%m-%d', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            WHERE timestamp >= datetime('now', '-7 day', 'localtime')
-            GROUP BY day_num
-            ORDER BY day_num ASC;
-        """)
-    
-    result = db.session.execute(query)
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.last_week()
     return jsonify([dict(row) for row in temperatures])
-
 
 @app.route("/last_month")
 def last_month():
-    
-    query = text("""
-            SELECT 
-                strftime('%d', timestamp) AS month_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y-%m-%d', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            WHERE timestamp >= datetime('now', '-1 month', 'localtime')
-            GROUP BY month_num
-            ORDER BY month_num ASC;
-        """)
-    
-    result = db.session.execute(query)
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.last_month()
     return jsonify([dict(row) for row in temperatures])
-
 
 @app.route("/last_year")
 def last_year():
-    
-    query = text("""
-            SELECT 
-                strftime('%m', timestamp) AS month_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y-%m', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            WHERE timestamp >= datetime('now', '-1 year', 'localtime')
-            GROUP BY month_num
-            ORDER BY month_num ASC;
-        """)
-    
-    result = db.session.execute(query)
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+    temperatures = Temperature.last_year()
     return jsonify([dict(row) for row in temperatures])
 
+@app.route("/yearly")
+def yearly():
+    temperatures = Temperature.yearly()
+    return jsonify([dict(row) for row in temperatures])
 
 @app.route("/all")
-def all():
-    
-    query = text("""
-            SELECT 
-                strftime('%Y', timestamp) AS year_num,
-                ROUND(AVG(temperature), 2) AS temperature,
-                strftime('%Y', timestamp) AS timestamp,
-                COUNT(*) AS record_count
-            FROM temperature
-            GROUP BY year_num
-            ORDER BY year_num ASC;
-        """)
-    
-    result = db.session.execute(query)
-    temperatures = result.mappings().all()
-    # return render_template('index.html', temperatures=temperatures)
+def all_route():
+    temperatures = Temperature.get_all_records()
     return jsonify([dict(row) for row in temperatures])
 
-
 @app.route('/add', methods=['POST'])
-def add_user():
+def add_temp():
     data = request.get_json()
 
     temperature = data["temperature"]
